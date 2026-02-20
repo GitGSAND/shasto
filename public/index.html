@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retail Ops Tool</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:      #E31E24;
+      --accent-dark: #b51519;
+      --navy:        #1A2B4A;
+      --navy-light:  #2c4170;
+      --bg:          #f0f2f5;
+      --surface:     #ffffff;
+      --border:      #d0d7e2;
+      --text:        #1a1d23;
+      --text-muted:  #6b7280;
+      --green:       #16a34a;
+      --green-bg:    #dcfce7;
+      --red:         #dc2626;
+      --red-bg:      #fee2e2;
+      --yellow-bg:   #fef9c3;
+      --radius:      8px;
+      --shadow:      0 1px 4px rgba(0,0,0,.08), 0 2px 12px rgba(0,0,0,.06);
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-width: 960px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy);
+      color: #fff;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 56px;
+      border-bottom: 3px solid var(--accent);
+    }
+    .header-logo {
+      width: 10px; height: 32px;
+      background: var(--accent);
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 18px; font-weight: 700; letter-spacing: .3px; }
+    .header-tagline { font-size: 12px; color: #94a3c0; margin-left: 4px; }
+
+    /* ── Layout ── */
+    .container { max-width: 1280px; margin: 0 auto; padding: 24px 32px; }
+    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Operation selector ── */
+    .op-select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+    .op-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    .op-meta {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .op-badge {
+      display: inline-block;
+      background: var(--navy);
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-right: 4px;
+    }
+
+    /* ── Input panel ── */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      font-size: 13px;
+    }
+    .dropzone.drag-over,
+    .dropzone:hover { border-color: var(--accent); background: #fff5f5; }
+    .dropzone .drop-icon { font-size: 24px; margin-bottom: 6px; }
+
+    .divider {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin: 10px 0;
+      position: relative;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: var(--border);
+    }
+    .divider::before { left: 0; }
+    .divider::after { right: 0; }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      resize: vertical;
+      line-height: 1.6;
+      color: var(--text);
+    }
+    textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    textarea::placeholder { color: var(--text-muted); }
+
+    .input-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .count-badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--navy);
+      background: #e8edf5;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .btn-link {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+    .btn-link:hover { color: var(--accent); }
+
+    /* ── Action bar ── */
+    .action-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 9px 20px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background .15s, opacity .15s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    .btn-primary  { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled)  { background: var(--accent-dark); }
+    .btn-danger   { background: #dc2626; color: #fff; }
+    .btn-danger:hover:not(:disabled)   { background: #b91c1c; }
+    .btn-success  { background: var(--green); color: #fff; }
+    .btn-success:hover:not(:disabled)  { background: #15803d; }
+    .btn-ghost    { background: #e8edf5; color: var(--navy); border: 1px solid var(--border); }
+    .btn-ghost:hover:not(:disabled)    { background: #d0d9ec; }
+
+    .status-badge {
+      margin-left: auto;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .status-idle    { background: #e8edf5; color: var(--navy); }
+    .status-running { background: #dbeafe; color: #1d4ed8; }
+    .status-stopped { background: var(--yellow-bg); color: #854d0e; }
+    .status-done    { background: var(--green-bg); color: var(--green); }
+    .status-error   { background: var(--red-bg); color: var(--red); }
+
+    /* ── Progress panel ── */
+    .progress-panel { margin-top: 20px; }
+    .progress-track {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--navy), var(--accent));
+      border-radius: 4px;
+      transition: width .4s ease;
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .stats-row {
+      display: flex;
+      gap: 20px;
+      font-size: 13px;
+    }
+    .stat { display: flex; align-items: center; gap: 6px; }
+    .stat-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .stat-found    .stat-dot { background: var(--green); }
+    .stat-notfound .stat-dot { background: #f59e0b; }
+    .stat-errors   .stat-dot { background: var(--red); }
+    .stat-label { color: var(--text-muted); }
+    .stat-val   { font-weight: 700; color: var(--text); }
+
+    .scanning-indicator {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .scanning-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .4; transform: scale(.7); }
+    }
+
+    /* ── Results table ── */
+    .results-wrap {
+      overflow-y: auto;
+      max-height: 45vh;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead { position: sticky; top: 0; background: var(--navy); color: #fff; z-index: 2; }
+    thead th {
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .4px;
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .12s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f5f7fb; }
+    tbody td { padding: 9px 12px; font-size: 13px; }
+
+    .row-found    { animation: flashGreen .6s ease-out; }
+    .row-notfound { animation: flashRed .6s ease-out; }
+    .row-error    { animation: flashRed .6s ease-out; }
+
+    @keyframes flashGreen {
+      0%   { background: #bbf7d0; }
+      100% { background: transparent; }
+    }
+    @keyframes flashRed {
+      0%   { background: #fecaca; }
+      100% { background: transparent; }
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+    .pill-found    { background: var(--green-bg); color: var(--green); }
+    .pill-notfound { background: var(--yellow-bg); color: #854d0e; }
+    .pill-error    { background: var(--red-bg); color: var(--red); }
+
+    /* ── Expanded detail row ── */
+    .detail-row td {
+      background: #f8fafc;
+      padding: 0;
+      border-bottom: 2px solid var(--border);
+    }
+    .detail-inner {
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 80px 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .detail-thumb {
+      width: 80px; height: 80px;
+      object-fit: contain;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      padding: 4px;
+    }
+    .detail-thumb-placeholder {
+      width: 80px; height: 80px;
+      background: var(--border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .detail-fields { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+    .detail-field { display: flex; gap: 6px; }
+    .detail-field-label { color: var(--text-muted); width: 100px; flex-shrink: 0; }
+    .detail-field-val { color: var(--text); word-break: break-all; }
+    .detail-desc {
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.6;
+      direction: rtl;
+      text-align: right;
+    }
+
+    /* ── Error message ── */
+    .error-msg {
+      background: var(--red-bg);
+      color: var(--red);
+      border: 1px solid #fca5a5;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .mt-16 { margin-top: 16px; }
+    .mt-20 { margin-top: 20px; }
+
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body x-data="app()" x-init="init()" x-cloak>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo"></div>
+    <h1>Retail Ops Tool</h1>
+    <span class="header-tagline">Internal data operations for Israeli retail brands</span>
+  </header>
+
+  <div class="container">
+    <div class="grid">
+
+      <!-- Left column: operation selector + input panel -->
+      <div>
+
+        <!-- Operation selector -->
+        <div class="card">
+          <div class="card-title">Operation</div>
+          <select
+            class="op-select"
+            x-model="selectedOperationId"
+            @change="onOperationChange()"
+          >
+            <option value="">— Select an operation —</option>
+            <template x-for="op in operations" :key="op.id">
+              <option :value="op.id" x-text="`${op.brand} · ${op.label}`"></option>
+            </template>
+          </select>
+
+          <template x-if="selectedOperation">
+            <div class="op-meta">
+              <span class="op-badge" x-text="selectedOperation.brand"></span>
+              <span x-text="selectedOperation.description"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Input panel -->
+        <template x-if="selectedOperation && selectedOperation.inputType === 'barcode-list'">
+          <div class="card mt-16">
+            <div class="card-title">Barcodes</div>
+
+            <div
+              class="dropzone"
+              :class="{ 'drag-over': isDragging }"
+              @dragover.prevent="isDragging = true"
+              @dragleave.prevent="isDragging = false"
+              @drop.prevent="onFileDrop($event)"
+              @click="$refs.fileInput.click()"
+            >
+              <div class="drop-icon">📂</div>
+              <div>Drop a <strong>CSV</strong> or <strong>TXT</strong> file here</div>
+              <div style="font-size:11px;margin-top:4px;">or click to browse</div>
+            </div>
+            <input
+              type="file"
+              accept=".csv,.txt"
+              x-ref="fileInput"
+              @change="onFileSelect($event)"
+              style="display:none"
+            />
+
+            <div class="divider">or paste manually</div>
+
+            <textarea
+              :placeholder="'7290012345678\n7290087654321\n...'"
+              x-model="rawInput"
+              @input="parseRawInput()"
+            ></textarea>
+
+            <div class="input-meta">
+              <span class="count-badge" x-text="barcodes.length + ' barcodes'"></span>
+              <button class="btn-link" @click="clearInput()" x-show="barcodes.length > 0">Clear</button>
+            </div>
+          </div>
+        </template>
+
+      </div>
+
+      <!-- Right column: action bar + progress + results -->
+      <div>
+
+        <!-- Action bar -->
+        <div class="card">
+          <div class="action-bar">
+            <button
+              class="btn btn-primary"
+              :disabled="!canStart"
+              @click="startRun()"
+              x-show="runStatus !== 'running'"
+            >
+              ▶ Start
+            </button>
+            <button
+              class="btn btn-danger"
+              @click="stopRun()"
+              x-show="runStatus === 'running'"
+            >
+              ■ Stop
+            </button>
+            <button
+              class="btn btn-success"
+              @click="downloadResult()"
+              x-show="hasOutput"
+            >
+              ↓ Download Excel
+            </button>
+            <button
+              class="btn btn-ghost"
+              @click="resetAll()"
+              x-show="runStatus === 'done' || runStatus === 'stopped' || runStatus === 'error'"
+            >
+              ↺ New Run
+            </button>
+
+            <span
+              class="status-badge"
+              :class="'status-' + runStatus"
+              x-text="runStatus.charAt(0).toUpperCase() + runStatus.slice(1)"
+            ></span>
+          </div>
+
+          <template x-if="errorMessage">
+            <div class="error-msg" x-text="errorMessage"></div>
+          </template>
+        </div>
+
+        <!-- Progress panel -->
+        <template x-if="runStatus !== 'idle'">
+          <div class="card mt-16 progress-panel">
+            <div class="progress-label">
+              <span x-text="`${progress.current} / ${progress.total}`"></span>
+              <span x-text="progress.total > 0 ? Math.round(progress.current / progress.total * 100) + '%' : '0%'"></span>
+            </div>
+            <div class="progress-track">
+              <div
+                class="progress-fill"
+                :style="`width: ${progress.total > 0 ? (progress.current / progress.total * 100) : 0}%`"
+              ></div>
+            </div>
+
+            <div class="stats-row">
+              <div class="stat stat-found">
+                <div class="stat-dot"></div>
+                <span class="stat-label">Found</span>
+                <span class="stat-val" x-text="progress.found"></span>
+              </div>
+              <div class="stat stat-notfound">
+                <div class="stat-dot"></div>
+                <span class="stat-label">Not Found</span>
+                <span class="stat-val" x-text="progress.notFound"></span>
+              </div>
+              <div class="stat stat-errors">
+                <div class="stat-dot"></div>
+                <span class="stat-label">Errors</span>
+                <span class="stat-val" x-text="progress.errors"></span>
+              </div>
+            </div>
+
+            <template x-if="runStatus === 'running' && currentBarcode">
+              <div class="scanning-indicator">
+                <div class="scanning-dot"></div>
+                <span>Scanning: <strong x-text="currentBarcode"></strong></span>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Results table -->
+        <template x-if="results.length > 0">
+          <div class="card mt-16">
+            <div class="card-title" x-text="`Results (${results.length})`"></div>
+            <div class="results-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Barcode</th>
+                    <th>Product Name</th>
+                    <th>Brand</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(row, i) in displayRows" :key="row._key">
+                    <tr
+                      :class="row._type === 'detail' ? 'detail-row' : 'row-' + (row.status === 'not_found' ? 'notfound' : row.status)"
+                      @click="row._type !== 'detail' && toggleRow(row._i)"
+                    >
+                      <!-- Result row cells -->
+                      <template x-if="row._type === 'result'">
+                        <td x-text="row.index || row._i + 1" style="color:var(--text-muted);width:40px"></td>
+                      </template>
+                      <template x-if="row._type === 'result'">
+                        <td><code x-text="row.barcode"></code></td>
+                      </template>
+                      <template x-if="row._type === 'result'">
+                        <td x-text="row.product?.name || '—'" style="direction:rtl;text-align:right;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+                      </template>
+                      <template x-if="row._type === 'result'">
+                        <td x-text="row.product?.brand || '—'" style="direction:rtl"></td>
+                      </template>
+                      <template x-if="row._type === 'result'">
+                        <td x-text="row.product?.currentPrice || '—'"></td>
+                      </template>
+                      <template x-if="row._type === 'result'">
+                        <td>
+                          <span
+                            class="pill"
+                            :class="'pill-' + (row.status === 'not_found' ? 'notfound' : row.status)"
+                            x-text="row.status === 'not_found' ? 'Not Found' : row.status.charAt(0).toUpperCase() + row.status.slice(1)"
+                          ></span>
+                        </td>
+                      </template>
+
+                      <!-- Detail row: single colspan cell -->
+                      <template x-if="row._type === 'detail'">
+                        <td colspan="6" style="padding:0;background:#f8fafc;border-bottom:2px solid var(--border)">
+                          <div class="detail-inner">
+                            <div>
+                              <template x-if="row.result.product?.imageUrl">
+                                <img class="detail-thumb" :src="row.result.product.imageUrl" :alt="row.result.product?.name" />
+                              </template>
+                              <template x-if="!row.result.product?.imageUrl">
+                                <div class="detail-thumb-placeholder">No Image</div>
+                              </template>
+                            </div>
+                            <div class="detail-fields">
+                              <div class="detail-field">
+                                <span class="detail-field-label">SKU</span>
+                                <span class="detail-field-val" x-text="row.result.product?.sku || '—'"></span>
+                              </div>
+                              <div class="detail-field">
+                                <span class="detail-field-label">Category</span>
+                                <span class="detail-field-val" x-text="row.result.product?.category || '—'"></span>
+                              </div>
+                              <div class="detail-field">
+                                <span class="detail-field-label">Original Price</span>
+                                <span class="detail-field-val" x-text="row.result.product?.originalPrice || '—'"></span>
+                              </div>
+                              <div class="detail-field">
+                                <span class="detail-field-label">Product URL</span>
+                                <span class="detail-field-val">
+                                  <template x-if="row.result.product?.productUrl">
+                                    <a :href="row.result.product.productUrl" target="_blank" style="color:var(--accent)">Open ↗</a>
+                                  </template>
+                                  <template x-if="!row.result.product?.productUrl">
+                                    <span>—</span>
+                                  </template>
+                                </span>
+                              </div>
+                              <template x-if="row.result.status === 'error'">
+                                <div class="detail-field">
+                                  <span class="detail-field-label">Error</span>
+                                  <span class="detail-field-val" style="color:var(--red)" x-text="row.result.message || '—'"></span>
+                                </div>
+                              </template>
+                            </div>
+                            <div>
+                              <template x-if="row.result.product?.description">
+                                <div class="detail-desc" x-text="row.result.product.description"></div>
+                              </template>
+                              <template x-if="!row.result.product?.description">
+                                <div style="font-size:12px;color:var(--text-muted)">No description available</div>
+                              </template>
+                            </div>
+                          </div>
+                        </td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function app() {
+      return {
+        operations: [],
+        selectedOperationId: '',
+        selectedOperation: null,
+        barcodes: [],
+        rawInput: '',
+        isDragging: false,
+
+        runId: null,
+        runStatus: 'idle',
+        progress: { current: 0, total: 0, found: 0, notFound: 0, errors: 0 },
+        results: [],
+        currentBarcode: '',
+        hasOutput: false,
+        errorMessage: null,
+        expandedRow: null,
+
+        _abortController: null,
+
+        get canStart() {
+          return this.selectedOperation !== null && this.barcodes.length > 0 && this.runStatus !== 'running'
+        },
+
+        get displayRows() {
+          const rows = []
+          for (let i = 0; i < this.results.length; i++) {
+            const result = this.results[i]
+            rows.push({ ...result, _type: 'result', _i: i, _key: `r-${i}` })
+            if (this.expandedRow === i) {
+              rows.push({ _type: 'detail', _i: i, _key: `d-${i}`, result })
+            }
+          }
+          return rows
+        },
+
+        async init() {
+          try {
+            const res = await fetch('/api/operations')
+            this.operations = await res.json()
+          } catch (err) {
+            this.errorMessage = 'Failed to load operations from server.'
+          }
+        },
+
+        onOperationChange() {
+          this.selectedOperation = this.operations.find((o) => o.id === this.selectedOperationId) || null
+          this.clearInput()
+          this.resetRunState()
+        },
+
+        parseRawInput() {
+          const lines = this.rawInput.split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean)
+          this.barcodes = [...new Set(lines)]
+        },
+
+        onFileDrop(event) {
+          this.isDragging = false
+          const file = event.dataTransfer?.files?.[0]
+          if (file) this.loadFile(file)
+        },
+
+        onFileSelect(event) {
+          const file = event.target.files?.[0]
+          if (file) this.loadFile(file)
+          event.target.value = ''
+        },
+
+        loadFile(file) {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            this.rawInput = e.target.result
+            this.parseRawInput()
+          }
+          reader.readAsText(file, 'utf-8')
+        },
+
+        clearInput() {
+          this.rawInput = ''
+          this.barcodes = []
+        },
+
+        resetRunState() {
+          this.runId = null
+          this.runStatus = 'idle'
+          this.progress = { current: 0, total: 0, found: 0, notFound: 0, errors: 0 }
+          this.results = []
+          this.currentBarcode = ''
+          this.hasOutput = false
+          this.errorMessage = null
+          this.expandedRow = null
+        },
+
+        resetAll() {
+          this.resetRunState()
+        },
+
+        toggleRow(index) {
+          this.expandedRow = this.expandedRow === index ? null : index
+        },
+
+        async startRun() {
+          if (!this.canStart) return
+          this.resetRunState()
+          this.runStatus = 'running'
+          this.errorMessage = null
+
+          this._abortController = new AbortController()
+
+          let response
+          try {
+            response = await fetch(`/api/run/${this.selectedOperation.id}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ barcodes: this.barcodes }),
+              signal: this._abortController.signal,
+            })
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              this.runStatus = 'error'
+              this.errorMessage = 'Failed to connect to server.'
+            }
+            return
+          }
+
+          if (!response.ok) {
+            this.runStatus = 'error'
+            const body = await response.json().catch(() => ({}))
+            this.errorMessage = body.error || 'Server returned an error.'
+            return
+          }
+
+          await this.consumeSseStream(response.body)
+        },
+
+        async consumeSseStream(body) {
+          const reader = body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buffer += decoder.decode(value, { stream: true })
+
+              const chunks = buffer.split('\n\n')
+              buffer = chunks.pop()
+
+              for (const chunk of chunks) {
+                for (const line of chunk.split('\n')) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const event = JSON.parse(line.slice(6))
+                      this.handleSseEvent(event)
+                    } catch {}
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            if (err.name !== 'AbortError' && this.runStatus === 'running') {
+              this.runStatus = 'error'
+              this.errorMessage = 'Stream connection lost.'
+            }
+          }
+        },
+
+        handleSseEvent(event) {
+          switch (event.type) {
+            case 'start':
+              this.runId = event.runId
+              this.progress.total = event.total
+              break
+
+            case 'result':
+              this.currentBarcode = event.barcode
+              this.progress.current = event.index
+              if (event.status === 'found')     this.progress.found++
+              if (event.status === 'not_found') this.progress.notFound++
+              if (event.status === 'error')     this.progress.errors++
+              this.results.push(event)
+              break
+
+            case 'done':
+              this.runStatus = 'done'
+              this.currentBarcode = ''
+              this.hasOutput = !!event.outputPath
+              break
+
+            case 'stopped':
+              this.runStatus = 'stopped'
+              this.currentBarcode = ''
+              this.hasOutput = !!event.outputPath
+              break
+
+            case 'error':
+              this.runStatus = 'error'
+              this.currentBarcode = ''
+              this.errorMessage = event.message || 'An unexpected error occurred.'
+              break
+          }
+        },
+
+        async stopRun() {
+          if (!this.runId) return
+          try {
+            await fetch(`/api/stop/${this.runId}`, { method: 'POST' })
+          } catch {}
+        },
+
+        downloadResult() {
+          if (!this.runId) return
+          window.location.href = `/api/download/${this.runId}`
+        },
+      }
+    }
+  </script>
+</body>
+</html>
