@@ -11,21 +11,26 @@ const STATUS_COLORS = {
   error: 'FFFFCCCC',
 }
 
-const RTL_COLS = new Set(['name', 'brand', 'description', 'category'])
+const RTL_COLS = new Set(['shortTitle', 'brand', 'description', 'category', 'mainCategory', 'ingredients'])
 
 const COLUMNS = [
-  { key: 'barcode',       header: 'Barcode',        width: 18 },
-  { key: 'name',          header: 'Name',            width: 40 },
-  { key: 'brand',         header: 'Brand',           width: 22 },
-  { key: 'currentPrice',  header: 'Price',           width: 12 },
-  { key: 'originalPrice', header: 'Original Price',  width: 16 },
-  { key: 'sku',           header: 'SKU',             width: 18 },
-  { key: 'category',      header: 'Category',        width: 24 },
-  { key: 'description',   header: 'Description',     width: 50 },
-  { key: 'imageUrl',      header: 'Image URL',       width: 50 },
-  { key: 'productUrl',    header: 'Product URL',     width: 50 },
-  { key: 'status',        header: 'Status',          width: 14 },
-  { key: 'scrapedAt',     header: 'Scraped At',      width: 20 },
+  { key: 'barcode',      header: 'Barcode',       width: 18 },
+  { key: 'shortTitle',   header: 'Short Title',   width: 44 },
+  { key: 'brand',        header: 'Brand',         width: 22 },
+  { key: 'mainCategory', header: 'Main Category', width: 20 },
+  { key: 'category',     header: 'Category',      width: 32 },
+  { key: 'price',        header: 'Price',         width: 12 },
+  { key: 'salePrice',    header: 'Sale Price',    width: 14 },
+  { key: 'promoEndDate', header: 'Promo End',     width: 13 },
+  { key: 'inStock',      header: 'In Stock',      width: 12 },
+  { key: 'productId',    header: 'Product ID',    width: 16 },
+  { key: 'sku',          header: 'SKU / EAN',     width: 18 },
+  { key: 'description',  header: 'Description',   width: 50 },
+  { key: 'ingredients',  header: 'Ingredients',   width: 50 },
+  { key: 'imageUrl',     header: 'Image URL',     width: 50 },
+  { key: 'productUrl',   header: 'Product URL',   width: 50 },
+  { key: 'status',       header: 'Status',        width: 14 },
+  { key: 'scrapedAt',    header: 'Scraped At',    width: 20 },
 ]
 
 function applyHeaderStyle(row) {
@@ -60,17 +65,22 @@ async function generate(results, runId) {
   for (const result of results) {
     const product = result.product || {}
     const rowData = {
-      barcode:       result.barcode,
-      name:          product.name          || null,
-      brand:         product.brand         || null,
-      currentPrice:  product.currentPrice  || null,
-      originalPrice: product.originalPrice || null,
-      sku:           product.sku           || null,
-      category:      product.category      || null,
-      description:   product.description   || null,
-      imageUrl:      product.imageUrl      || null,
-      productUrl:    product.productUrl    || null,
-      status:        result.status,
+      barcode:      result.barcode,
+      shortTitle:   product.shortTitle   || null,
+      brand:        product.brand        || null,
+      mainCategory: product.mainCategory || null,
+      category:     product.category     || null,
+      price:        product.price        || null,
+      salePrice:    product.salePrice    || null,
+      promoEndDate: product.promoEndDate || null,
+      inStock:      product.inStock === true ? 'Yes' : product.inStock === false ? 'No' : null,
+      productId:    product.productId    || null,
+      sku:          product.sku          || null,
+      description:  product.description  || null,
+      ingredients:  product.ingredients  || null,
+      imageUrl:     product.imageUrl     || null,
+      productUrl:   product.productUrl   || null,
+      status:       result.status,
       scrapedAt,
     }
 
@@ -84,6 +94,15 @@ async function generate(results, runId) {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: statusColor },
+      }
+    }
+
+    if (rowData.inStock === 'No') {
+      const inStockCellIndex = COLUMNS.findIndex((c) => c.key === 'inStock') + 1
+      row.getCell(inStockCellIndex).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFCE4D6' }, // light orange
       }
     }
 

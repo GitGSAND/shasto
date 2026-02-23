@@ -579,7 +579,7 @@
                   <tr>
                     <th>#</th>
                     <th>Barcode</th>
-                    <th>Product Name</th>
+                    <th>Short Title</th>
                     <th>Brand</th>
                     <th>Price</th>
                     <th>Status</th>
@@ -599,13 +599,13 @@
                         <td><code x-text="row.barcode"></code></td>
                       </template>
                       <template x-if="row._type === 'result'">
-                        <td x-text="row.product?.name || '—'" style="direction:rtl;text-align:right;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+                        <td x-text="row.product?.shortTitle || '—'" style="direction:rtl;text-align:right;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
                       </template>
                       <template x-if="row._type === 'result'">
                         <td x-text="row.product?.brand || '—'" style="direction:rtl"></td>
                       </template>
                       <template x-if="row._type === 'result'">
-                        <td x-text="row.product?.currentPrice || '—'"></td>
+                        <td x-text="row.product?.salePrice ? row.product.salePrice + ' ↙ ' + row.product.price : (row.product?.price || '—')"></td>
                       </template>
                       <template x-if="row._type === 'result'">
                         <td>
@@ -631,16 +631,40 @@
                             </div>
                             <div class="detail-fields">
                               <div class="detail-field">
-                                <span class="detail-field-label">SKU</span>
+                                <span class="detail-field-label">Product ID</span>
+                                <span class="detail-field-val" x-text="row.result.product?.productId || '—'"></span>
+                              </div>
+                              <div class="detail-field">
+                                <span class="detail-field-label">SKU / EAN</span>
                                 <span class="detail-field-val" x-text="row.result.product?.sku || '—'"></span>
+                              </div>
+                              <div class="detail-field">
+                                <span class="detail-field-label">Main Category</span>
+                                <span class="detail-field-val" x-text="row.result.product?.mainCategory || '—'"></span>
                               </div>
                               <div class="detail-field">
                                 <span class="detail-field-label">Category</span>
                                 <span class="detail-field-val" x-text="row.result.product?.category || '—'"></span>
                               </div>
                               <div class="detail-field">
-                                <span class="detail-field-label">Original Price</span>
-                                <span class="detail-field-val" x-text="row.result.product?.originalPrice || '—'"></span>
+                                <span class="detail-field-label">Price</span>
+                                <span class="detail-field-val" x-text="row.result.product?.price || '—'"></span>
+                              </div>
+                              <div class="detail-field">
+                                <span class="detail-field-label">Sale Price</span>
+                                <span class="detail-field-val" x-text="row.result.product?.salePrice || '—'"></span>
+                              </div>
+                              <div class="detail-field" x-show="row.result.product?.promoEndDate">
+                                <span class="detail-field-label">Promo Ends</span>
+                                <span class="detail-field-val" x-text="row.result.product?.promoEndDate"></span>
+                              </div>
+                              <div class="detail-field" x-show="row.result.product?.inStock !== null && row.result.product?.inStock !== undefined">
+                                <span class="detail-field-label">In Stock</span>
+                                <span
+                                  class="detail-field-val"
+                                  :style="row.result.product?.inStock === false ? 'color:var(--red);font-weight:700' : 'color:var(--green);font-weight:700'"
+                                  x-text="row.result.product?.inStock ? 'Yes' : 'No'"
+                                ></span>
                               </div>
                               <div class="detail-field">
                                 <span class="detail-field-label">Product URL</span>

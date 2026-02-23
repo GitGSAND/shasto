@@ -10,13 +10,13 @@ const IMAGE_BASE   = 'https://superpharmstorage.blob.core.windows.net/hybris/pro
 // All delays are in milliseconds. Jitter adds randomness so requests don't
 // arrive at perfectly even intervals (a common bot detection signal).
 
-const INTER_BARCODE_DELAY_MS  = 2000  // base pause between barcodes
-const INTER_BARCODE_JITTER_MS = 1000  // random 0–1000ms added on top
-const API_MIN_DELAY_MS        = 300   // minimum gap after a Nixale API call
+const INTER_BARCODE_DELAY_MS  = 800   // base pause between barcodes
+const INTER_BARCODE_JITTER_MS = 400   // random 0–400ms added on top
+const API_MIN_DELAY_MS        = 150   // minimum gap after a Nixale API call
 const BATCH_SIZE               = 20   // take a longer pause every N barcodes
-const BATCH_PAUSE_MS           = 15_000 // how long to pause between batches
+const BATCH_PAUSE_MS           = 8_000 // how long to pause between batches
 
-const NAV_TIMEOUT_MS          = 35_000
+const NAV_TIMEOUT_MS          = 20_000
 const RESULT_WAIT_TIMEOUT_MS  = 15_000
 
 const USER_AGENT =
@@ -30,12 +30,12 @@ const SEL = {
   cardLink:    'a.item-box-link',
   cardImage:   'div.item-box.initialized .item-image img',
 
-  // Product page (for description + ingredients)
+  // Product page (for description + ingredients + stock status)
+  outOfStock:   '.add-to-basket-wrap.outOfStock',
   productName:  'h1 .product-name, h1',
   productBrand: '.product-title',
   priceEl:      '.price-container .item-price',
   oldPrice:     '.old-price.price-row',
-  productImage: '.product-image.single .swiper-slide img, .gallery-top .swiper-slide img',
   description:  '#product-info .content-side',
   ean:          '.description-ean',
   category:     '.breadcrumb li:nth-last-child(3)',
@@ -70,20 +70,18 @@ async function queryNixaleApi(barcode) {
 
   const p = data.products[0]
 
-  // When sPrice exists it's the discounted/current price; price is then the original
-  const currentPrice  = p.sPrice ? String(p.sPrice) : String(p.price)
-  const originalPrice = p.sPrice ? String(p.price)  : null
-
   return {
-    name:          p.shortTitle   || null,
-    brand:         p.brand        || null,
-    currentPrice,
-    originalPrice,
-    category:      p.category     || p.cat || null,
+    shortTitle:    p.shortTitle || null,
+    brand:         p.brand      || null,
+    price:         p.price      != null ? String(p.price)  : null,
+    salePrice:     p.sPrice     != null ? String(p.sPrice) : null,
+    category:      p.category   || null,   // specific (e.g. "רחצת תינוקות - שמפו לתינוק")
+    mainCategory:  p.cat        || null,   // broad top-level (e.g. "תינוקות ופעוטות")
+    promoEndDate:  p.eD         || null,   // sale expiry date, only present when sPrice exists
+    productId:     p.id         || null,   // Super Pharm internal ID (mp-XXXXXXXX)
     imageUrl:      p.image ? `${IMAGE_BASE}${p.image}` : null,
     productUrl:    p.url   ? `${SITE_ORIGIN}/${p.url}` : null,
     sku:           p.image ? p.image.replace('.jpg', '') : null,
-    internalId:    p.id           || null,
   }
 }
 
@@ -154,14 +152,40 @@ async function launchBrowser() {
   })
 }
 
+// Block resources that don't affect the DOM structure we care about.
+// Images, fonts, media, and stylesheets are pure presentation — skipping
+// them shaves several seconds off each product page load.
+const BLOCKED_RESOURCE_TYPES = new Set(['image', 'font', 'media', 'stylesheet'])
+
+async function createPage(browser) {
+  const page = await browser.newPage()
+  await page.setUserAgent(USER_AGENT)
+  await page.setViewport({ width: 1400, height: 900 })
+  await page.setRequestInterception(true)
+  page.on('request', (req) => {
+    if (BLOCKED_RESOURCE_TYPES.has(req.resourceType())) {
+      req.abort()
+    } else {
+      req.continue()
+    }
+  })
+  return page
+}
+
 // ── Product page scrape (description + ingredients) ─────────────────────────
 
 async function scrapeProductPage(page, productUrl) {
   logger.debug('Scraping product page for extra details', { url: productUrl })
   await page.goto(productUrl, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS })
-  await sleep(1500)
+  // Wait for the add-to-cart area which is the last JS-rendered element we need.
+  // Resolves immediately when ready instead of burning a fixed delay.
+  await page.waitForSelector('.add-to-basket-wrap, h1 .product-name', { timeout: 6000 }).catch(() => {})
+  await sleep(200) // brief settle for any final DOM mutations
 
-  const description = await extract(page, SEL.description)
+  const rawDescription = await extract(page, SEL.description)
+  const description = rawDescription
+    ? rawDescription.replace(/^תיאור המוצר\s*/u, '').trim() || null
+    : null
 
   const rawEan = await extract(page, SEL.ean)
   const ean    = rawEan ? rawEan.replace(/[^0-9]/g, '') || null : null
@@ -171,16 +195,20 @@ async function scrapeProductPage(page, productUrl) {
   ).catch(() => [])
   const ingredients = ingredientsList.length ? ingredientsList.join(', ') : null
 
-  // Also pick up fields that the API might have missed
-  const name         = await extract(page, SEL.productName)
-  const brand        = await extract(page, SEL.productBrand)
-  const priceAttr    = await page.$eval(SEL.priceEl, (el) => el.dataset?.price || null).catch(() => null)
-  const currentPrice = priceAttr || await extractPrice(page, SEL.priceEl)
-  const originalPrice = await extractPrice(page, SEL.oldPrice)
-  const imageUrl     = await extractAttr(page, SEL.productImage, 'src')
-  const category     = await extract(page, SEL.category)
+  // Enrich shortTitle, brand, category from DOM when available.
+  // imageUrl is intentionally NOT taken from the DOM — the product image is
+  // lazy-loaded and the <img> src is a placeholder until scroll, so we always
+  // use the Azure blob URL constructed from the API's image filename instead.
+  const shortTitle = await extract(page, SEL.productName)
+  const brand      = await extract(page, SEL.productBrand)
+  const category   = await extract(page, SEL.category)
 
-  return { name, brand, currentPrice, originalPrice, imageUrl, description, sku: ean, category, ingredients }
+  // Out-of-stock: presence of .add-to-basket-wrap.outOfStock means unavailable
+  const oosEl   = await page.$(SEL.outOfStock)
+  const inStock  = oosEl === null  // null = element not found = product is in stock
+
+  // Prices and imageUrl are never taken from the DOM — always sourced from the API
+  return { shortTitle, brand, description, sku: ean, category, ingredients, inStock }
 }
 
 // ── Puppeteer search page fallback ───────────────────────────────────────────
@@ -204,26 +232,29 @@ async function searchWithPuppeteer(page, barcode) {
   if (!card) return null
 
   const cardData = await page.$eval(SEL.productCard, (el) => ({
-    name:  el.dataset.name  || null,
-    brand: el.dataset.brand || null,
-    price: el.dataset.price || null,
-    sku:   el.dataset.id    || null,
+    shortTitle:  el.dataset.name          || null,
+    brand:       el.dataset.brand         || null,
+    price:       el.dataset.price         || null,
+    salePrice:   el.dataset.discountprice || null,
+    productId:   el.dataset.id            || null,
   }))
 
-  const relHref  = await extractAttr(page, SEL.cardLink, 'href')
+  const relHref    = await extractAttr(page, SEL.cardLink, 'href')
   const productUrl = relHref ? `${SITE_ORIGIN}${relHref}` : null
   const imageUrl   = await extractAttr(page, SEL.cardImage, 'src')
 
   return {
-    name:          cardData.name,
-    brand:         cardData.brand,
-    currentPrice:  cardData.price,
-    originalPrice: null,
-    category:      null,
+    shortTitle:   cardData.shortTitle,
+    brand:        cardData.brand,
+    price:        cardData.price,
+    salePrice:    cardData.salePrice  || null,
+    productId:    cardData.productId  || null,
+    category:     null,
+    mainCategory: null,
+    promoEndDate: null,
     imageUrl,
     productUrl,
-    sku:           cardData.sku,
-    internalId:    cardData.sku,
+    sku:          cardData.productId  || null,
   }
 }
 
@@ -263,9 +294,7 @@ async function* run(barcodes, stopSignal) {
               browser = await launchBrowser()
               logger.info('Puppeteer browser launched (for product page details)')
             }
-            page = await browser.newPage()
-            await page.setUserAgent(USER_AGENT)
-            await page.setViewport({ width: 1400, height: 900 })
+            page = await createPage(browser)
 
             try {
               extraDetails = await scrapeProductPage(page, apiResult.productUrl)
@@ -275,16 +304,20 @@ async function* run(barcodes, stopSignal) {
           }
 
           const product = {
-            name:          extraDetails.name          || apiResult.name,
-            brand:         extraDetails.brand         || apiResult.brand,
-            currentPrice:  extraDetails.currentPrice  || apiResult.currentPrice,
-            originalPrice: extraDetails.originalPrice || apiResult.originalPrice,
-            imageUrl:      extraDetails.imageUrl      || apiResult.imageUrl,
-            productUrl:    apiResult.productUrl,
-            description:   extraDetails.description   || null,
-            sku:           extraDetails.sku           || apiResult.sku,
-            category:      extraDetails.category      || apiResult.category,
-            ingredients:   extraDetails.ingredients   || null,
+            shortTitle:   extraDetails.shortTitle   || apiResult.shortTitle,
+            brand:        extraDetails.brand         || apiResult.brand,
+            price:        apiResult.price,
+            salePrice:    apiResult.salePrice,
+            promoEndDate: apiResult.promoEndDate,
+            productId:    apiResult.productId,
+            category:     extraDetails.category      || apiResult.category,
+            mainCategory: apiResult.mainCategory,
+            imageUrl:     apiResult.imageUrl,
+            productUrl:   apiResult.productUrl,
+            description:  extraDetails.description   || null,
+            sku:          extraDetails.sku           || apiResult.sku,
+            ingredients:  extraDetails.ingredients   || null,
+            inStock:      extraDetails.inStock ?? null, // null = product page not visited
           }
 
           yield { status: 'found', barcode, index: index + 1, total, product }
@@ -297,9 +330,7 @@ async function* run(barcodes, stopSignal) {
             browser = await launchBrowser()
             logger.info('Puppeteer browser launched (for search fallback)')
           }
-          page = await browser.newPage()
-          await page.setUserAgent(USER_AGENT)
-          await page.setViewport({ width: 1400, height: 900 })
+          page = await createPage(browser)
 
           let searchResult = await searchWithPuppeteer(page, barcode)
 
@@ -324,9 +355,7 @@ async function* run(barcodes, stopSignal) {
           if (searchResult.productUrl) {
             try {
               if (page && !page.isClosed()) await page.close()
-              page = await browser.newPage()
-              await page.setUserAgent(USER_AGENT)
-              await page.setViewport({ width: 1400, height: 900 })
+              page = await createPage(browser)
               extraDetails = await scrapeProductPage(page, searchResult.productUrl)
             } catch (err) {
               logger.warn('Product page scrape failed after search fallback', { barcode, error: err.message })
@@ -334,16 +363,20 @@ async function* run(barcodes, stopSignal) {
           }
 
           const product = {
-            name:          extraDetails.name          || searchResult.name,
-            brand:         extraDetails.brand         || searchResult.brand,
-            currentPrice:  extraDetails.currentPrice  || searchResult.currentPrice,
-            originalPrice: extraDetails.originalPrice || null,
-            imageUrl:      extraDetails.imageUrl      || searchResult.imageUrl,
-            productUrl:    searchResult.productUrl,
-            description:   extraDetails.description   || null,
-            sku:           extraDetails.sku           || searchResult.sku,
-            category:      extraDetails.category      || null,
-            ingredients:   extraDetails.ingredients   || null,
+            shortTitle:   extraDetails.shortTitle   || searchResult.shortTitle,
+            brand:        extraDetails.brand         || searchResult.brand,
+            price:        searchResult.price,
+            salePrice:    searchResult.salePrice,
+            promoEndDate: null,
+            productId:    searchResult.productId,
+            category:     extraDetails.category      || null,
+            mainCategory: null,
+            imageUrl:     searchResult.imageUrl,
+            productUrl:   searchResult.productUrl,
+            description:  extraDetails.description   || null,
+            sku:          extraDetails.sku           || searchResult.sku,
+            ingredients:  extraDetails.ingredients   || null,
+            inStock:      extraDetails.inStock ?? null,
           }
 
           yield { status: 'found', barcode, index: index + 1, total, product }
