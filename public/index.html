@@ -438,7 +438,7 @@
           </template>
         </div>
 
-        <!-- Input panel -->
+        <!-- Input panel: barcode list -->
         <template x-if="selectedOperation && selectedOperation.inputType === 'barcode-list'">
           <div class="card mt-16">
             <div class="card-title">Barcodes</div>
@@ -473,6 +473,48 @@
 
             <div class="input-meta">
               <span class="count-badge" x-text="barcodes.length + ' barcodes'"></span>
+              <button class="btn-link" @click="clearInput()" x-show="barcodes.length > 0">Clear</button>
+            </div>
+          </div>
+        </template>
+
+        <!-- Input panel: name list (Hebrew) -->
+        <template x-if="selectedOperation && selectedOperation.inputType === 'name-list'">
+          <div class="card mt-16">
+            <div class="card-title">Product / Brand Names</div>
+
+            <div
+              class="dropzone"
+              :class="{ 'drag-over': isDragging }"
+              @dragover.prevent="isDragging = true"
+              @dragleave.prevent="isDragging = false"
+              @drop.prevent="onFileDrop($event)"
+              @click="$refs.nameFileInput.click()"
+            >
+              <div class="drop-icon">📂</div>
+              <div>Drop a <strong>CSV</strong> or <strong>TXT</strong> file here</div>
+              <div style="font-size:11px;margin-top:4px;">or click to browse</div>
+            </div>
+            <input
+              type="file"
+              accept=".csv,.txt"
+              x-ref="nameFileInput"
+              @change="onFileSelect($event)"
+              style="display:none"
+            />
+
+            <div class="divider">or paste manually</div>
+
+            <textarea
+              dir="rtl"
+              style="font-size:15px"
+              :placeholder="'קולגייט\nפלמוליב\nלוריאל\n...'"
+              x-model="rawInput"
+              @input="parseRawInput()"
+            ></textarea>
+
+            <div class="input-meta">
+              <span class="count-badge" x-text="barcodes.length + ' names'"></span>
               <button class="btn-link" @click="clearInput()" x-show="barcodes.length > 0">Clear</button>
             </div>
           </div>
@@ -563,7 +605,10 @@
             <template x-if="runStatus === 'running' && currentBarcode">
               <div class="scanning-indicator">
                 <div class="scanning-dot"></div>
-                <span>Scanning: <strong x-text="currentBarcode"></strong></span>
+                <span>
+                  <span x-text="selectedOperation?.inputType === 'name-list' ? 'Searching:' : 'Scanning:'"></span>
+                  <strong x-text="currentBarcode"></strong>
+                </span>
               </div>
             </template>
           </div>
@@ -578,7 +623,7 @@
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Barcode</th>
+                    <th x-text="selectedOperation?.inputType === 'name-list' ? 'EAN / ID' : 'Barcode'"></th>
                     <th>Short Title</th>
                     <th>Brand</th>
                     <th>Price</th>
@@ -630,6 +675,12 @@
                               </template>
                             </div>
                             <div class="detail-fields">
+                              <template x-if="row.result.searchQuery">
+                                <div class="detail-field">
+                                  <span class="detail-field-label">Search Query</span>
+                                  <span class="detail-field-val" style="direction:rtl;font-weight:600" x-text="row.result.searchQuery"></span>
+                                </div>
+                              </template>
                               <div class="detail-field">
                                 <span class="detail-field-label">Product ID</span>
                                 <span class="detail-field-val" x-text="row.result.product?.productId || '—'"></span>
@@ -819,10 +870,11 @@
 
           let response
           try {
+            const bodyKey = this.selectedOperation.inputType === 'name-list' ? 'names' : 'barcodes'
             response = await fetch(`/api/run/${this.selectedOperation.id}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ barcodes: this.barcodes }),
+              body: JSON.stringify({ [bodyKey]: this.barcodes }),
               signal: this._abortController.signal,
             })
           } catch (err) {
@@ -884,8 +936,9 @@
               break
 
             case 'result':
-              this.currentBarcode = event.barcode
+              this.currentBarcode = event.searchQuery || event.barcode
               this.progress.current = event.index
+              if (event.total && event.total > this.progress.total) this.progress.total = event.total
               if (event.status === 'found')     this.progress.found++
               if (event.status === 'not_found') this.progress.notFound++
               if (event.status === 'error')     this.progress.errors++

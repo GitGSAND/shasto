@@ -429,3 +429,16 @@ async function* run(barcodes, stopSignal) {
 }
 
 module.exports = run
+// Shared helpers exported for use by other Super Pharm operations
+module.exports.queryNixaleApi    = queryNixaleApi
+module.exports.scrapeProductPage = scrapeProductPage
+module.exports.createPage        = createPage
+module.exports.launchBrowser     = launchBrowser
+module.exports.sleep             = sleep
+module.exports.jitteredDelay     = jitteredDelay
+module.exports.batchPauseIfNeeded = batchPauseIfNeeded
+module.exports.IMAGE_BASE        = IMAGE_BASE
+module.exports.SITE_ORIGIN       = SITE_ORIGIN
+module.exports.NAV_TIMEOUT_MS    = NAV_TIMEOUT_MS
+module.exports.RESULT_WAIT_TIMEOUT_MS = RESULT_WAIT_TIMEOUT_MS
+module.exports.SEL               = SEL

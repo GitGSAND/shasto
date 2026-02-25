@@ -65,9 +65,9 @@ function createRunId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-// ── Barcode parsing helpers ──────────────────────────────────────────────────
+// ── Input parsing helpers ────────────────────────────────────────────────────
 
-function parseBarcodesFromText(text) {
+function parseItemsFromText(text) {
   return text
     .split(/[\r\n,]+/)
     .map((s) => s.trim())
@@ -75,10 +75,10 @@ function parseBarcodesFromText(text) {
     .filter((v, i, a) => a.indexOf(v) === i)
 }
 
-function parseBarcodesFromCsv(buffer) {
+function parseItemsFromCsv(buffer) {
   const records = parse(buffer, { skip_empty_lines: true, trim: true })
-  const barcodes = records.flat().map((v) => v.toString().trim()).filter(Boolean)
-  return [...new Set(barcodes)]
+  const items = records.flat().map((v) => v.toString().trim()).filter(Boolean)
+  return [...new Set(items)]
 }
 
 function extractBarcodes(req) {
@@ -86,15 +86,33 @@ function extractBarcodes(req) {
     const mime = req.file.mimetype
     const name = req.file.originalname.toLowerCase()
     if (name.endsWith('.csv') || mime === 'text/csv') {
-      return parseBarcodesFromCsv(req.file.buffer)
+      return parseItemsFromCsv(req.file.buffer)
     }
-    return parseBarcodesFromText(req.file.buffer.toString('utf-8'))
+    return parseItemsFromText(req.file.buffer.toString('utf-8'))
   }
   if (Array.isArray(req.body?.barcodes)) {
     return [...new Set(req.body.barcodes.map((b) => b.toString().trim()).filter(Boolean))]
   }
   if (typeof req.body?.barcodes === 'string') {
-    return parseBarcodesFromText(req.body.barcodes)
+    return parseItemsFromText(req.body.barcodes)
+  }
+  return []
+}
+
+function extractNames(req) {
+  if (req.file) {
+    const mime = req.file.mimetype
+    const name = req.file.originalname.toLowerCase()
+    if (name.endsWith('.csv') || mime === 'text/csv') {
+      return parseItemsFromCsv(req.file.buffer)
+    }
+    return parseItemsFromText(req.file.buffer.toString('utf-8'))
+  }
+  if (Array.isArray(req.body?.names)) {
+    return [...new Set(req.body.names.map((n) => n.toString().trim()).filter(Boolean))]
+  }
+  if (typeof req.body?.names === 'string') {
+    return parseItemsFromText(req.body.names)
   }
   return []
 }
@@ -118,9 +136,13 @@ app.post('/api/run/:operationId', upload.single('file'), (req, res) => {
     return res.status(404).json({ error: 'Operation not found' })
   }
 
-  const barcodes = extractBarcodes(req)
-  if (barcodes.length === 0) {
-    return res.status(400).json({ error: 'No barcodes provided' })
+  const items = manifest.inputType === 'name-list'
+    ? extractNames(req)
+    : extractBarcodes(req)
+
+  if (items.length === 0) {
+    const noun = manifest.inputType === 'name-list' ? 'names' : 'barcodes'
+    return res.status(400).json({ error: `No ${noun} provided` })
   }
 
   const runId = createRunId()
@@ -136,9 +158,9 @@ app.post('/api/run/:operationId', upload.single('file'), (req, res) => {
   runs.set(runId, run)
 
   const stream = new SseStream(res)
-  logger.info('Run started', { runId, operationId: manifest.id, barcodeCount: barcodes.length })
+  logger.info('Run started', { runId, operationId: manifest.id, inputType: manifest.inputType, itemCount: items.length })
 
-  runOperation({ manifest, items: barcodes, stream, runId, stopSignal, run }).catch((err) => {
+  runOperation({ manifest, items, stream, runId, stopSignal, run }).catch((err) => {
     logger.error('Unhandled error in runOperation', { runId, error: err.message })
   })
 })
