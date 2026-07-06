@@ -7,8 +7,8 @@ An internal Node.js web application for scraping and processing product data fro
 ## Prerequisites
 
 - **Node.js v18+** — [nodejs.org](https://nodejs.org)
-- **Windows 10 or 11**
-- ~300MB free disk space (Puppeteer downloads its own Chromium ~150MB, plus dependencies)
+- **Google Chrome** installed (required for the KSP scraper, which uses your system Chrome to bypass Cloudflare)
+- ~150MB free disk space (Puppeteer downloads a Chromium binary for the Super Pharm scraper)
 
 ---
 
@@ -18,7 +18,28 @@ An internal Node.js web application for scraping and processing product data fro
 npm install
 ```
 
-Puppeteer will automatically download a compatible Chromium binary during install. This is a one-time download of approximately 150MB and requires an internet connection.
+Puppeteer will automatically download a compatible Chromium binary during install (~150MB, one-time, requires internet).
+
+**KSP scraper — Chrome path**
+
+The KSP operation launches your locally installed Google Chrome (not the bundled Chromium) to bypass Cloudflare. The default path assumes a standard Windows installation:
+
+```
+C:\Program Files\Google\Chrome\Application\chrome.exe
+```
+
+If Chrome is installed elsewhere, or you're on Mac/Linux, set the `CHROME_PATH` environment variable before starting:
+
+```bash
+# macOS
+CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm start
+
+# Linux
+CHROME_PATH="/usr/bin/google-chrome" npm start
+
+# Windows (non-default location) — PowerShell
+$env:CHROME_PATH="D:\Chrome\chrome.exe"; npm start
+```
 
 ---
 

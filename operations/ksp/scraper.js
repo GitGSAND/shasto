@@ -8,7 +8,7 @@ puppeteer.use(StealthPlugin())
 
 const SITE              = 'https://ksp.co.il'
 const SSE_URL           = `${SITE}/m_action/sse/streams`
-const CHROME_PATH       = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+const CHROME_PATH = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 const PAGE_SIZE         = 12
 const MAX_PAGES         = 20
 const MAX_PRODUCTS      = 500
